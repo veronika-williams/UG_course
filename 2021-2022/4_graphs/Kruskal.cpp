@@ -1,56 +1,111 @@
 #include <bits/stdc++.h>
 using namespace std;
+#define int long long
+#define x first
+#define y second
+const int N = 1e5 + 3;
 
-#define ll long long
-#define INF 1000000000
-#define f first
-#define s second
-#define PB push_back
+bool used[N];
+vector<pair<int, int>> g[N];
 
-struct edge {
-    int v, u, cost;
-};
+/*
+ *алгоритм Прима
+ * Изначально остов — одна произвольная вершина.
+ * Пока минимальный остов не найден, выбирается ребро минимального веса,
+ * исходящее из какой-нибудь вершины текущего остова в вершину,
+ * которую мы ещё не добавили. Добавляем это ребро в остов и начинаем
+ * заново, пока остов не будет найден.
+ */
 
-int n, m, mst_sum;
-vector<int> id(100);
-vector<edge> edges, mst;
-vector<vector<pair<int,int>>> g(100);
-
-bool cmp(edge a, edge b) {
-    return ((a.cost < b.cost) || (a.cost == b.cost && a.v < b.v) || (a.cost == b.cost && a.v == b.v && a.u < b.u));
+// O(nm)
+int mst() {
+    used[0] = true;
+    int wt = 0;
+    for (int i = 1; i < N; ++i) {
+        int min_ed = 1e12, min_v = -1, min_u = -1;
+        for (int u = 0; u < N; ++u) {
+            if (!used[u]) continue;
+            for (auto &p : g[u]) {
+                if (used[p.x]) continue;
+                if (min_ed > p.y) {
+                    min_ed = p.y;
+                    min_v = p.x;
+                    min_u = u;
+                }
+            }
+        }
+        wt += min_ed;
+        used[min_v] = true;
+        // {min_u, min_v} in mst
+    }
+    return wt;
 }
 
-int main() {
-
-    cin >> n >> m;
-    for (int i = 1; i <= m; ++i) {
-        int v, u, c;
-        cin >> v >> u >> c;
-        g[v].PB({c,u}), g[u].PB({c,v}), edges.PB({v, u, c});
+// O(m log(n))
+int mst() {
+    used[0] = true;
+    int wt = 0;
+    set<pair<int, pair<int, int>>> st;  //{вес, {откуда, куда}}
+    for (auto &p : g[0]) {              // изначальная инициализация
+        st.insert({p.y, {0, p.x}});
     }
-    sort(edges.begin(), edges.end(), cmp);
-    for (int i = 1; i <= n; ++i) id[i] = i;
-    for (int i = 0; i < m; ++i) {
-        int a = edges[i].v, b = edges[i].u, c = edges[i].cost;
-        if (id[a] == id[b]) continue;
-        mst_sum += c;
-        mst.PB({a, b, c});
-        int old_id = id[b], new_id = id[a];
-        for (int j = 1; j <= n; ++j)
-            if (id[j] == old_id) id[j] = new_id;
-    }
-    cout << mst_sum << endl;
-    for (auto i : mst) cout << i.v << ' ' << i.u << ' ' << i.cost << endl;
+    for (int i = 1; i < N; ++i) {
+        int min_ed = st.begin()->x;   // вес минимального ребра
+        int min_v = st.begin()->y.x;  // откуда
+        int min_u = st.begin()->y.y;  // куда
 
-    return 0;
+        wt += min_ed;        // увеличиваем ответ
+        used[min_u] = true;  // {min_u, min_v} in mst
+
+        for (auto &p : g[min_u]) {  // обновляем st
+            if (used[p.x]) {
+                // !если это ребро между вершинами множества
+                st.erase({p.y, {p.x, min_u}});
+            } else {
+                //! если ребро в вершину не из множества
+                st.insert({p.y, {min_u, p.x}});
+            }
+        }
+    }
+    return wt;
 }
 
-// 6 8
-// 1 3 1
-// 1 6 2
-// 1 2 8
-// 2 4 10
-// 2 5 10
-// 3 4 2
-// 4 5 3
-// 6 2 2
+/*
+ * Алгоритм Краскала
+ * отсортировать все ребра и пытаться добавлять их в изначально пустой
+ *  остов в порядке возрастания их весов.
+ */
+
+int par[N];  // не забыть проставить родителей
+int rk[N];
+
+int find_t(int v) {
+    if (v == par[v]) return v;
+    return par[v] = find_t(par[v]);
+}
+
+bool unite(int a, int b) {
+    a = find_t(a);
+    b = find_t(b);
+    if (a == b) return false;
+    if (rk[a] < rk[b]) swap(a, b);  //! подвешиваем вершинку меньшей высоты к вершинке большей высоты
+    par[b] = a;
+    if (rk[a] == rk[b]) ++rk[a];
+    return true;
+}
+
+int mst(vector<pair<int, pair<int, int>>> &e) {  // дан вектор ребер
+    // for (int i = 0; i < N; ++i) {
+    //     par[i] = i;
+    // }
+    iota(par, par + N, 0);  // последовательные числа
+    sort(e.begin(), e.end());
+    int wt = 0;
+    for (auto &p : e) {
+        if (unite(p.y.x, p.y.y)) {
+            wt += p.x;
+            // {p.y.x, p.y.y} in mst
+        }
+    }
+    return wt;
+}
